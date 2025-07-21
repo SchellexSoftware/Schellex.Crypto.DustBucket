@@ -17,7 +17,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../Schellex.Crypto.Coinbase.AdvancedApi.Interfaces/Schellex.Crypto.Coinbase.AdvancedApi.Interfaces.csproj" />
-    <ProjectReference Include="../Schellex.Crypto.Coinbase.AdvancedApi.Models/Schellex.Crypto.Coinbase.AdvancedApi.Models.csproj" />
   </ItemGroup>
 
 </Project>
