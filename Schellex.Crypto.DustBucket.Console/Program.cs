@@ -11,15 +11,17 @@ try
         .ConfigureAppConfiguration((hostingContext, config) =>
         {
             var env = hostingContext.HostingEnvironment;
+            var basePath = AppContext.BaseDirectory;
 
             config
+                .SetBasePath(basePath)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
                 .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true) // NOTE: DO NOT COMMIT THIS FILE
                 .AddEnvironmentVariables();
         })
         .ConfigureServices((context, services) =>
-        { 
+        {
             services.AddHostedService<AppService>();
             services.AddSingleton<IConfiguration>(context.Configuration);
             services.AddSingleton<IServiceCollection>(services);
@@ -32,7 +34,7 @@ try
 
     var host = builder.Build();
     await host.RunAsync();
-    
+
     Environment.Exit(0);
 }
 catch (Exception ex)
