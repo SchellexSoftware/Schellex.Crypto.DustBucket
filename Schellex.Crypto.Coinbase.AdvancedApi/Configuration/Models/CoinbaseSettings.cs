@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Schellex.Crypto.Coinbase.AdvancedApi.Models;
+namespace Schellex.Crypto.Coinbase.AdvancedApi.Configuration.Models;
 
 public record CoinbaseSettings
 {

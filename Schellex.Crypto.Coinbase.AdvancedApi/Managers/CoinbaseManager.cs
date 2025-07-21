@@ -1,20 +1,19 @@
 ﻿using Jose;
 using System.Text;
 using System.Text.Json;
-using Schellex.Crypto.Coinbase.AdvancedApi.Models;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
+using Schellex.Crypto.Coinbase.AdvancedApi.Interfaces.Managers;
+using Schellex.Crypto.Coinbase.AdvancedApi.Configuration.Interfaces;
 
 namespace Schellex.Crypto.Coinbase.AdvancedApi.Managers
 {
-    public class CoinbaseManager
+    public class CoinbaseManager : ICoinbaseManager
     {
-        private readonly CoinbaseSettings _settings;
+        private readonly IAppSettings _appSettings;
 
-        public CoinbaseManager(CoinbaseSettings settings)
+        public CoinbaseManager(IAppSettings appSettings)
         {
-            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _appSettings = appSettings;
         }
 
         public async Task<string> CreateOrderAsync(string productId, decimal price, string side)
@@ -56,83 +55,52 @@ namespace Schellex.Crypto.Coinbase.AdvancedApi.Managers
             return result;
         }
 
-        public string GetAuthToken(string endpoint, string action)
+        private string GetAuthToken(string endpoint, string action)
         {
-            string name = _settings.ApiKey;
-            string cbPrivateKey = _settings.Secret;
+            string name = _appSettings.CoinbaseSettings.ApiKey;
+            string cbPrivateKey = _appSettings.CoinbaseSettings.Secret;
 
             string key = ParseKey(cbPrivateKey);
             string token = GenerateToken(name, key, $"{action} {endpoint}");
-
-            var isTokenValid = IsTokenValid(token, name, key);
-            Console.WriteLine($"Token is valid? {isTokenValid}");
-
-            if (!isTokenValid)
-            {
-                throw new Exception("Invalid token generated. Please check your API key and secret.");
-            }
 
             return token;
         }
 
         private string GenerateToken(string name, string secret, string uri)
         {
+            if (string.IsNullOrEmpty(secret))
+            {
+                throw new ArgumentException("Secret key cannot be null or empty.");
+            }
+
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new ArgumentException("Name cannot be null or empty.");
+            }
+
             var privateKeyBytes = Convert.FromBase64String(secret); // Assuming PEM is base64 encoded
             using var key = ECDsa.Create();
             key.ImportECPrivateKey(privateKeyBytes, out _);
 
             var payload = new Dictionary<string, object>
-             {
-                 { "sub", name },
-                 { "iss", "coinbase-cloud" },
-                 { "nbf", Convert.ToInt64((DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds) },
-                 { "exp", Convert.ToInt64((DateTime.UtcNow.AddMinutes(1) - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds) },
-                 { "uri", uri }
-             };
+                    {
+                        { "sub", name },
+                        { "iss", "coinbase-cloud" },
+                        { "nbf", Convert.ToInt64((DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds) },
+                        { "exp", Convert.ToInt64((DateTime.UtcNow.AddMinutes(1) - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds) },
+                        { "uri", uri }
+                    };
 
             var extraHeaders = new Dictionary<string, object>
-             {
-                 { "kid", name },
-                 // add nonce to prevent replay attacks with a random 10 digit number
-                 { "nonce", RandomHex(10) },
-                 { "typ", "JWT"}
-             };
+                    {
+                        { "kid", name },
+                        // add nonce to prevent replay attacks with a random 10 digit number
+                        { "nonce", RandomHex(10) },
+                        { "typ", "JWT"}
+                    };
 
             var encodedToken = JWT.Encode(payload, key, JwsAlgorithm.ES256, extraHeaders);
-
-            // print token
-            Console.WriteLine(encodedToken);
             return encodedToken;
-        }
-
-        private bool IsTokenValid(string token, string tokenId, string secret)
-        {
-            if (token == null)
-                return false;
-
-            var key = ECDsa.Create();
-            key?.ImportECPrivateKey(Convert.FromBase64String(secret), out _);
-
-            var securityKey = new ECDsaSecurityKey(key) { KeyId = tokenId };
-
-            try
-            {
-                var tokenHandler = new JwtSecurityTokenHandler();
-                tokenHandler.ValidateToken(token, new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = securityKey,
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ClockSkew = TimeSpan.Zero
-                }, out var validatedToken);
-
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private string ParseKey(string key)
@@ -145,7 +113,6 @@ namespace Schellex.Crypto.Coinbase.AdvancedApi.Managers
 
             return String.Join("", keyLines);
         }
-
 
         private string RandomHex(int digits)
         {
@@ -165,7 +132,7 @@ namespace Schellex.Crypto.Coinbase.AdvancedApi.Managers
 
         private async Task<string> CallApiGETAsync(string endpoint)
         {
-            var bearerToken = GetAuthToken($"{_settings.BaseUrl}/{endpoint}", "GET");
+            var bearerToken = GetAuthToken($"{_appSettings.CoinbaseSettings.BaseUrl}/{endpoint}", "GET");
 
             if (string.IsNullOrEmpty(bearerToken))
             {
@@ -174,7 +141,7 @@ namespace Schellex.Crypto.Coinbase.AdvancedApi.Managers
 
             using (var client = new HttpClient())
             {
-                using (var request = new HttpRequestMessage(HttpMethod.Get, $"https://{_settings.BaseUrl}/{endpoint}"))
+                using (var request = new HttpRequestMessage(HttpMethod.Get, $"https://{_appSettings.CoinbaseSettings.BaseUrl}/{endpoint}"))
                 {
                     if (!string.IsNullOrEmpty(bearerToken))
                     {
@@ -197,7 +164,7 @@ namespace Schellex.Crypto.Coinbase.AdvancedApi.Managers
 
         private async Task<string> CallApiPOSTAsync(string endpoint, string jsonPayload)
         {
-            var bearerToken = GetAuthToken($"{_settings.BaseUrl}/{endpoint}", "POST");
+            var bearerToken = GetAuthToken($"{_appSettings.CoinbaseSettings.BaseUrl}/{endpoint}", "POST");
 
             if (string.IsNullOrEmpty(bearerToken))
             {
@@ -207,7 +174,7 @@ namespace Schellex.Crypto.Coinbase.AdvancedApi.Managers
             using (var client = new HttpClient())
             {
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-                using (var request = new HttpRequestMessage(HttpMethod.Post, $"https://{_settings.BaseUrl}/{endpoint}") { Content = content })
+                using (var request = new HttpRequestMessage(HttpMethod.Post, $"https://{_appSettings.CoinbaseSettings.BaseUrl}/{endpoint}") { Content = content })
                 {
                     if (!string.IsNullOrEmpty(bearerToken))
                     {

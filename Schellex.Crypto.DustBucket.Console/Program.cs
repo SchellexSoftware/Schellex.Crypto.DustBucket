@@ -1,22 +1,42 @@
-﻿
-using Schellex.Crypto.Coinbase.AdvancedApi.Models;
-using Schellex.Crypto.Coinbase.AdvancedApi.Managers;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Schellex.Crypto.Coinbase.AdvancedApi.Extensions;
+using Schellex.Crypto.DustBucket.BusinessLogic.Extensions;
+using Schellex.Crypto.DustBucket.Console;
 
-var config = new ConfigurationBuilder()
-    .SetBasePath(Directory.GetCurrentDirectory())
-    .AddJsonFile("appsettings.json", optional: false)
-    .AddJsonFile("appsettings.local.json", optional: true) // Note: Do not commit this file.
-    .Build();
+try
+{
+    var builder = Host.CreateDefaultBuilder(args)
+        .ConfigureAppConfiguration((hostingContext, config) =>
+        {
+            var env = hostingContext.HostingEnvironment;
 
-var settings = config.GetSection("Coinbase").Get<CoinbaseSettings>()!;
-var coinbaseManager = new CoinbaseManager(settings);
+            config
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
+                .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true) // NOTE: DO NOT COMMIT THIS FILE
+                .AddEnvironmentVariables();
+        })
+        .ConfigureServices((context, services) =>
+        { 
+            services.AddHostedService<AppService>();
+            services.AddSingleton<IConfiguration>(context.Configuration);
+            services.AddSingleton<IServiceCollection>(services);
 
-var accountInfoResult = await coinbaseManager.GetAccountInfoAsync();
-Console.WriteLine($"Current Price: {accountInfoResult}");
+            #region App Specific Services
+            services.AddDustBucketServices(context.Configuration);
+            services.AddCoinbaseServices(context.Configuration);
+            #endregion
+        });
 
-// var currentPriceResult = await coinbaseManager.GetCurrentPriceAsync("BTC-USDC");
-// Console.WriteLine($"Current Price: {currentPriceResult}");
-
-// var orderResult = await coinbaseManager.CreateOrderAsync("BTC-USDC", 5.00m, "BUY");
-// Console.WriteLine($"Order Result: {orderResult}");
+    var host = builder.Build();
+    await host.RunAsync();
+    
+    Environment.Exit(0);
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"An error occurred: {ex.Message}");
+    Environment.Exit(1);
+}
