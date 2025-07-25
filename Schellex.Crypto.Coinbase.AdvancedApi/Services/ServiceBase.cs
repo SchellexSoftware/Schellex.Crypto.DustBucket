@@ -5,15 +5,28 @@ using Schellex.Crypto.Coinbase.AdvancedApi.Configuration.Interfaces;
 
 namespace Schellex.Crypto.Coinbase.AdvancedApi.Services;
 
+/// <summary>
+/// Base class for Coinbase service implementations. Handles authenticated HTTP requests
+/// and JWT token generation required for Coinbase Advanced API communication.
+/// </summary>
 public class ServiceBase
 {
     private readonly IAppSettings _appSettings;
 
+    /// <summary>
+    /// Initializes the base service with application configuration.
+    /// </summary>
+    /// <param name="appSettings">Injected app settings interface.</param>
     public ServiceBase(IAppSettings appSettings)
     {
         _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
     }
 
+    /// <summary>
+    /// Executes an authenticated GET request to the specified Coinbase API endpoint.
+    /// </summary>
+    /// <param name="endpoint">The endpoint to call, relative to the base URL.</param>
+    /// <returns>A JSON string response from the API.</returns>
     protected async Task<string> CallApiGETAsync(string endpoint)
     {
         var bearerToken = GetAuthToken($"{_appSettings.CoinbaseSettings.BaseUrl}/{endpoint}", "GET");
@@ -46,6 +59,12 @@ public class ServiceBase
         }
     }
 
+    /// <summary>
+    /// Executes an authenticated POST request to the specified Coinbase API endpoint with a JSON payload.
+    /// </summary>
+    /// <param name="endpoint">The endpoint to call, relative to the base URL.</param>
+    /// <param name="jsonPayload">The JSON-formatted request body.</param>
+    /// <returns>A JSON string response from the API.</returns>
     protected async Task<string> CallApiPOSTAsync(string endpoint, string jsonPayload)
     {
         var bearerToken = GetAuthToken($"{_appSettings.CoinbaseSettings.BaseUrl}/{endpoint}", "POST");
@@ -79,6 +98,12 @@ public class ServiceBase
         }
     }
 
+    /// <summary>
+    /// Generates a signed JWT bearer token for use with Coinbase API requests.
+    /// </summary>
+    /// <param name="endpoint">The full API URI.</param>
+    /// <param name="action">The HTTP method (GET or POST).</param>
+    /// <returns>A signed JWT bearer token.</returns>
     private string GetAuthToken(string endpoint, string action)
     {
         string name = _appSettings.CoinbaseSettings.ApiKey;
@@ -90,6 +115,13 @@ public class ServiceBase
         return token;
     }
 
+    /// <summary>
+    /// Constructs and signs a JWT token using the provided name and secret key.
+    /// </summary>
+    /// <param name="name">API key ID.</param>
+    /// <param name="secret">Base64-encoded private key string.</param>
+    /// <param name="uri">The URI being accessed (used in the JWT payload).</param>
+    /// <returns>A signed JWT token string.</returns>
     private string GenerateToken(string name, string secret, string uri)
     {
         if (string.IsNullOrEmpty(secret))
@@ -127,6 +159,11 @@ public class ServiceBase
         return encodedToken;
     }
 
+    /// <summary>
+    /// Strips header and footer lines from a PEM key string and returns the raw key.
+    /// </summary>
+    /// <param name="key">PEM-formatted private key string.</param>
+    /// <returns>Base64 string without headers/footers.</returns>
     private string ParseKey(string key)
     {
         List<string> keyLines = new List<string>();
@@ -138,6 +175,11 @@ public class ServiceBase
         return String.Join("", keyLines);
     }
 
+    /// <summary>
+    /// Generates a random hexadecimal string of the specified digit length.
+    /// </summary>
+    /// <param name="digits">Number of hex digits to generate.</param>
+    /// <returns>A random hexadecimal string.</returns>
     private string RandomHex(int digits)
     {
         byte[] buffer = new byte[digits / 2];

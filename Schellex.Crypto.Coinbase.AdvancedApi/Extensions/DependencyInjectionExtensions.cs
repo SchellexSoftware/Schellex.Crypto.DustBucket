@@ -9,8 +9,17 @@ using Schellex.Crypto.Coinbase.AdvancedApi.Services;
 
 namespace Schellex.Crypto.Coinbase.AdvancedApi.Extensions;
 
+/// <summary>
+/// Provides an extension method to register Coinbase API services into the dependency injection container.
+/// </summary>
 public static class DependencyInjectionExtensions
 {
+    /// <summary>
+    /// Adds all required Coinbase Advanced API services and configuration to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection to register services with.</param>
+    /// <param name="configuration">The application's configuration instance.</param>
+    /// <returns>The modified service collection with Coinbase services registered.</returns>
     public static IServiceCollection AddCoinbaseServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<IAppSettings, AppSettings>();
